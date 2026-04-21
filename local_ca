@@ -1,0 +1,166 @@
+#!/bin/bash
+
+# Définition du répertoire de base
+BASE_DIR="/home/julien/Desktop/Lab/CaKeyManager"
+
+# Définition des variables
+CA_DIR="$BASE_DIR/ca"
+CA_KEY="$CA_DIR/ca.key"
+CA_CERT="$CA_DIR/ca.crt"
+DOMAINS_DIR="$BASE_DIR/domains"
+CA_VALIDITY=5475  # 15 ans en jours
+CERT_VALIDITY=5475  # 15 ans en jours
+
+# Fonction pour créer le CA
+create_ca() {
+    if [ -f "$CA_KEY" ] && [ -f "$CA_CERT" ]; then
+        echo "Le CA existe déjà."
+        return
+    fi
+
+    echo "Création du CA..."
+    mkdir -p "$CA_DIR"
+    openssl genrsa -out "$CA_KEY" 4096
+    openssl req -x509 -new -nodes -key "$CA_KEY" -sha256 -days $CA_VALIDITY -out "$CA_CERT" \
+        -subj "/C=FR/ST=Local/L=Local/O=Local Development/OU=IT/CN=Local CA"
+    echo "CA créé avec succès."
+}
+
+# Fonction pour créer un certificat de domaine
+create_domain_cert() {
+    read -p "Entrez le nom de domaine (ex: example.com) : " domain
+    read -p "Entrez les sous-domaines séparés par des espaces (ex: www api) ou appuyez sur Entrée pour ignorer : " subdomains
+
+    domain_dir="$DOMAINS_DIR/$domain"
+    mkdir -p "$domain_dir"
+
+    # Création du fichier de configuration pour le certificat
+    cat > "$domain_dir/$domain.cnf" <<EOF
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+C = FR
+ST = Local
+L = Local
+O = Local Development
+OU = IT
+CN = $domain
+
+[v3_req]
+keyUsage = critical, digitalSignature, keyAgreement
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = $domain
+EOF
+
+    # Ajout des sous-domaines au fichier de configuration
+    counter=2
+    for subdomain in $subdomains; do
+        echo "DNS.$counter = $subdomain.$domain" >> "$domain_dir/$domain.cnf"
+        ((counter++))
+    done
+
+    # Génération de la clé et du certificat
+    openssl genrsa -out "$domain_dir/$domain.key" 2048
+    openssl req -new -key "$domain_dir/$domain.key" -out "$domain_dir/$domain.csr" -config "$domain_dir/$domain.cnf"
+    openssl x509 -req -in "$domain_dir/$domain.csr" -CA "$CA_CERT" -CAkey "$CA_KEY" -CAcreateserial \
+        -out "$domain_dir/$domain.crt" -days $CERT_VALIDITY -sha256 -extfile "$domain_dir/$domain.cnf" -extensions v3_req
+
+    echo "Certificat créé pour $domain et ses sous-domaines"
+}
+
+# Fonction pour vérifier un certificat
+verify_cert() {
+    read -p "Entrez le nom de domaine à vérifier : " domain
+    domain_dir="$DOMAINS_DIR/$domain"
+    if [ ! -f "$domain_dir/$domain.crt" ]; then
+        echo "Le certificat pour $domain n'existe pas."
+        return
+    fi
+    openssl verify -CAfile "$CA_CERT" "$domain_dir/$domain.crt"
+    echo "Informations du certificat :"
+    openssl x509 -in "$domain_dir/$domain.crt" -text -noout | grep -E "Subject:|Not Before:|Not After:|Subject Alternative Name:"
+}
+
+# Fonction pour renouveler un certificat
+renew_cert() {
+    read -p "Entrez le nom de domaine du certificat à renouveler : " domain
+    domain_dir="$DOMAINS_DIR/$domain"
+    if [ ! -f "$domain_dir/$domain.crt" ]; then
+        echo "Le certificat pour $domain n'existe pas."
+        return
+    fi
+
+    # Renouvellement du certificat
+    openssl x509 -req -in "$domain_dir/$domain.csr" -CA "$CA_CERT" -CAkey "$CA_KEY" -CAcreateserial \
+        -out "$domain_dir/$domain.crt" -days $CERT_VALIDITY -sha256 -extfile "$domain_dir/$domain.cnf" -extensions v3_req
+
+    echo "Certificat renouvelé pour $domain"
+}
+
+# Fonction pour lister tous les certificats
+list_certs() {
+    echo "Certificats existants :"
+    for domain_dir in $DOMAINS_DIR/*; do
+        if [ -d "$domain_dir" ]; then
+            domain=$(basename "$domain_dir")
+            expiration=$(openssl x509 -enddate -noout -in "$domain_dir/$domain.crt" | cut -d= -f2)
+            echo "$domain - Expire le : $expiration"
+        fi
+    done
+}
+
+# Fonction d'aide
+show_help() {
+    echo "Usage:"
+    echo "  create - Créer un nouveau certificat de domaine"
+    echo "  verify - Vérifier un certificat existant"
+    echo "  renew  - Renouveler un certificat existant"
+    echo "  list   - Lister tous les certificats"
+    echo "  help   - Afficher ce message d'aide"
+    echo "  exit   - Quitter le programme"
+}
+
+# Vérification de l'existence du répertoire de base
+if [ ! -d "$BASE_DIR" ]; then
+    mkdir -p "$BASE_DIR"
+    echo "Répertoire de base créé : $BASE_DIR"
+fi
+
+# Vérification et création du CA
+create_ca
+
+# Boucle principale
+while true; do
+    echo
+    read -p "Choisissez une action (create/verify/renew/list/help/exit) : " action
+    case $action in
+        create)
+            create_domain_cert
+            ;;
+        verify)
+            verify_cert
+            ;;
+        renew)
+            renew_cert
+            ;;
+        list)
+            list_certs
+            ;;
+        help)
+            show_help
+            ;;
+        exit)
+            echo "Au revoir!"
+            exit 0
+            ;;
+        *)
+            echo "Action non reconnue. Tapez 'help' pour voir les options disponibles."
+            ;;
+    esac
+done

@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Chemin vers le certificat CA local
+CA_CERT_PATH="$HOME/Desktop/Lab/CaKeyManager/ca/ca.crt"
+
+# Vérifier si le certificat existe
+if [ ! -f "$CA_CERT_PATH" ]; then
+  echo "Le certificat CA n'existe pas à l'emplacement spécifié : $CA_CERT_PATH"
+  exit 1
+fi
+
+# Créer le répertoire pour la CA locale
+sudo mkdir -p /etc/ca-certificates/trust-source/local-ca
+
+# Copier le certificat CA dans le répertoire créé
+sudo cp "$CA_CERT_PATH" /etc/ca-certificates/trust-source/local-ca/
+
+# Mettre à jour le magasin de certificats de confiance
+sudo update-ca-trust
+
+# Vérifier que le certificat a été ajouté
+if ls /etc/ssl/certs/ | grep -q ca.crt; then
+  echo "Le certificat CA a été ajouté avec succès."
+else
+  echo "Le certificat CA n'a pas été ajouté correctement."
+  exit 1
+fi
+
+# Redémarrer les services nécessaires (exemple pour Apache et Nginx)
+sudo systemctl restart httpd  # Pour Apache
+sudo systemctl restart nginx  # Pour Nginx
+
+echo "Le script s'est exécuté avec succès."

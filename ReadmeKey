@@ -1,0 +1,16 @@
+server.net.key :
+
+Description : C'est la clé privée du serveur.
+Utilité : La clé privée est utilisée pour déchiffrer les informations envoyées par les clients. Elle doit rester secrète et ne jamais être partagée publiquement. C'est une partie essentielle pour établir une connexion sécurisée car elle permet de déchiffrer les données chiffrées avec la clé publique.
+server.net.csr :
+
+Description : C'est la demande de signature de certificat (Certificate Signing Request).
+Utilité : Un fichier CSR est généré sur le serveur où le certificat sera installé. Il contient des informations sur le serveur et la clé publique, et il est utilisé pour demander un certificat à une autorité de certification (CA). Le fichier CSR est envoyé à la CA pour obtenir un certificat SSL.
+server.net.crt :
+
+Description : C'est le certificat du serveur, signé par une autorité de certification.
+Utilité : Le fichier CRT est le certificat SSL proprement dit. Il est retourné par la CA après la soumission du CSR et la vérification de l'identité du demandeur. Le certificat est utilisé par le serveur pour établir des connexions sécurisées avec les clients. Il contient la clé publique et est signé par la clé privée de l'autorité de certification.
+server.net.cnf :
+
+Description : C'est un fichier de configuration.
+Utilité : Ce fichier est utilisé lors de la création de la clé privée et de la demande de signature de certificat (CSR). Il contient des informations telles que le nom commun (nom de domaine), l'organisation, le pays, etc., qui seront incluses dans le CSR.
