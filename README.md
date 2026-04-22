@@ -1,32 +1,30 @@
 # CA Key Manager
 
-OpenSSL Certificate Authority configuration for managing TLS certificates across multiple internal services.
+Gestion d'une Autorité de Certification (CA) OpenSSL pour les certificats TLS d'un lab multi-services.
 
-## Overview
-
-Manages a custom CA and per-service certificates for a self-hosted homelab. Covers GitLab, Jupyter, Docker registry, and documentation servers under internal domains.
-
-## Services Covered
+## Services couverts
 
 - `gitlab-ce.server.net`
 - `jupyter.server.net`
 - `registry.server.net`
+- `rocketchat.server.net`
 - `documentation.server.net`
 - `cotia.tg`
 
 ## Structure
 
-- `ca/` - Root CA configuration and certificate
-- Per-domain folders with `.cnf`, `.csr`, `.crt` files
+- `ca/` — Certificat racine de la CA
+- `domains/<service>/` — Fichiers `.cnf`, `.csr`, `.crt` par service
 
-## Usage
+## Générer un certificat
 
-Generate a certificate for a new service:
 ```bash
+# Créer la clé privée et la CSR
 openssl req -new -newkey rsa:2048 -nodes -keyout service.key -out service.csr -config service.cnf
+# Signer avec la CA
 openssl x509 -req -in service.csr -CA ca/ca.crt -CAkey ca/ca.key -CAcreateserial -out service.crt -days 365
 ```
 
-## Security
+## Sécurité
 
-Private key files (`*.key`) are not tracked. Generate them locally using the provided `.cnf` files.
+Les clés privées (`*.key`) sont exclues du dépôt. Voir `SECURITY.md`.
